@@ -3,6 +3,7 @@ from picar_4wd.servo import Servo
 from picar_4wd.pwm import PWM
 from picar_4wd.pin import Pin
 
+
 class Ultrasonic():
     ANGLE_RANGE = 180
     STEP = 18
@@ -11,12 +12,11 @@ class Ultrasonic():
         self.timeout = timeout
         self.trig = trig
         self.echo = echo
-        # Init Servo
         self.servo = Servo(PWM("P0"), offset=10)
-        self.angle_distance = [0,0]
+        self.angle_distance = [0, 0]
         self.current_angle = 0
-        self.max_angle = self.ANGLE_RANGE/2
-        self.min_angle = -self.ANGLE_RANGE/2
+        self.max_angle = self.ANGLE_RANGE / 2
+        self.min_angle = -self.ANGLE_RANGE / 2
         self.scan_list = []
 
     def get_distance(self):
@@ -28,19 +28,67 @@ class Ultrasonic():
         pulse_end = 0
         pulse_start = 0
         timeout_start = time.time()
-        while self.echo.value()==0:
+        while self.echo.value() == 0:
             pulse_start = time.time()
             if pulse_start - timeout_start > self.timeout:
                 return -1
-        while self.echo.value()==1:
+        while self.echo.value() == 1:
             pulse_end = time.time()
             if pulse_end - timeout_start > self.timeout:
                 return -2
         during = pulse_end - pulse_start
         cm = round(during * 340 / 2 * 100, 2)
-        #print(cm)
         return cm
 
+
+# Initialize Ultrasonic Sensor
+trig_pin = Pin(pin='D0')
+echo_pin = Pin(pin='D1')
+ultrasonic = Ultrasonic(trig=trig_pin, echo=echo_pin)
+
+# Initialize Servo for Steering
+steering_servo = Servo(PWM("P0"), offset=10)
+
+# Define a function to stop and change direction
+
+
+def avoid_obstacle():
+    print("Obstacle detected! Stopping and changing direction.")
+
+    # Stop the car by setting motor speed to 0
+    from picar_4wd import forward, backward, stop
+    stop()
+
+    # Change direction by adjusting the servo angle
+    # For example, turn the steering servo to the right
+    steering_servo.set_angle(90)  # Adjust the angle as needed
+
+    # Back up the car for a brief moment
+    backward()
+    time.sleep(1)  # Adjust the duration as needed
+
+    # Resume forward motion
+    forward()
+    time.sleep(1)  # Continue forward for a brief moment
+
+    # Restore the steering servo to its original position
+    steering_servo.set_angle(0)  # Adjust the angle as needed
+
+    # Sleep to allow time for the car to stop and change direction
+    time.sleep(1)
+
+
+try:
+    while True:
+        distance = ultrasonic.get_distance()
+        if distance > 0 and distance < 20:  # Adjust the range as needed
+            avoid_obstacle()
+        time.sleep(0.1)
+
+except KeyboardInterrupt:
+    pass
+
+    # The following commented-out functions are for more advanced functionality
     # def get_distance_at(self, angle):
     #     self.servo.set_angle(angle)
     #     time.sleep(0.04)
@@ -65,14 +113,11 @@ class Ultrasonic():
     #         self.current_angle = self.min_angle
     #         us_step = self.STEP
     #     self.current_angle += us_step
-    #     status = self.get_status_at(self.current_angle, ref1=ref)#ref1避障基准值，ref2跟随小车后退时基准值
-
+    #     status = self.get_status_at(self.current_angle, ref1=ref)
     #     self.scan_list.append(status)
     #     if self.current_angle == self.min_angle or self.current_angle == self.max_angle:
     #         if us_step < 0:
-    #             # print("reverse")
     #             self.scan_list.reverse()
-    #         # print(self.scan_list)
     #         self.scan_list = []
     #         return self.scan_list
     #     else:
